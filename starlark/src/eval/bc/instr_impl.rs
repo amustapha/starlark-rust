@@ -86,6 +86,8 @@ use crate::values::layout::value_not_special::FrozenValueNotSpecial;
 use crate::values::string::dot_format::format_one;
 use crate::values::string::interpolation::percent_s_one;
 use crate::values::types::any_array::FrozenAnyArray;
+use crate::values::types::float::float::nan_unequal;
+use crate::values::types::float::float::nan_unordered;
 use crate::values::types::known_methods::KnownMethod;
 use crate::values::types::list::value::ListData;
 use crate::values::typing::type_compiled::compiled::TypeCompiled;
@@ -472,6 +474,9 @@ pub(crate) type InstrEqInt = InstrNoFlow<InstrEqIntImpl>;
 impl InstrBinOpImpl for InstrEqImpl {
     #[inline(always)]
     fn eval<'v>(v0: Value<'v>, v1: Value<'v>, _heap: Heap<'v>) -> crate::Result<Value<'v>> {
+        if nan_unequal(v0, v1) {
+            return Ok(Value::new_bool(false));
+        }
         v0.equals(v1).map(Value::new_bool)
     }
 }
@@ -814,6 +819,9 @@ pub(crate) struct InstrCompare<I: InstrCompareImpl>(marker::PhantomData<I>);
 impl<I: InstrCompareImpl> InstrBinOpImpl for InstrCompare<I> {
     #[inline(always)]
     fn eval<'v>(v0: Value<'v>, v1: Value<'v>, _heap: Heap<'v>) -> crate::Result<Value<'v>> {
+        if nan_unordered(v0, v1) {
+            return Ok(Value::new_bool(false));
+        }
         Ok(Value::new_bool(I::eval_compare(v0.compare(v1)?)))
     }
 }

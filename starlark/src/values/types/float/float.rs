@@ -174,6 +174,24 @@ pub(crate) fn write_compact<W: fmt::Write>(
 #[serde(transparent)]
 pub struct StarlarkFloat(pub f64);
 
+/// Whether `v` is a float NaN.
+fn is_nan(v: Value) -> bool {
+    matches!(v.unpack_num(), Some(NumRef::Float(f)) if f.0.is_nan())
+}
+
+/// Whether an ordered comparison of `a` and `b` (`<`, `<=`, `>`, `>=`) is false because one of
+/// two numbers is NaN, as in Python (IEEE 754), where Starlark's spec orders NaN above them all.
+/// Sorting keeps the spec's total order.
+pub(crate) fn nan_unordered(a: Value, b: Value) -> bool {
+    (is_nan(a) && b.unpack_num().is_some()) || (is_nan(b) && a.unpack_num().is_some())
+}
+
+/// Whether `a == b` is false because one of them is NaN, as in Python: the operator finds a NaN
+/// equal to nothing, itself included, while a container still finds the very value it holds.
+pub(crate) fn nan_unequal(a: Value, b: Value) -> bool {
+    is_nan(a) || is_nan(b)
+}
+
 impl StarlarkFloat {
     /// The result of calling `type()` on floats.
     pub const TYPE: &'static str = "float";
@@ -263,6 +281,10 @@ impl Display for StarlarkFloat {
 #[starlark_value(type = StarlarkFloat::TYPE)]
 impl<'v> StarlarkValue<'v> for StarlarkFloat {
     fn equals(&self, other: Value) -> crate::Result<bool> {
+        // As in Python, NaN equals nothing (Value::equals still finds a value equal to itself).
+        if self.0.is_nan() {
+            return Ok(false);
+        }
         Ok(Some(NumRef::Float(StarlarkFloat(self.0))) == other.unpack_num())
     }
 

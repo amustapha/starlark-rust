@@ -73,6 +73,8 @@ use crate::values::Value;
 use crate::values::ValueError;
 use crate::values::ValueLike;
 use crate::values::bool::StarlarkBool;
+use crate::values::types::float::float::nan_unequal;
+use crate::values::types::float::float::nan_unordered;
 use crate::values::function::BoundMethodGen;
 use crate::values::function::FrozenBoundMethod;
 use crate::values::list::ListRef;
@@ -208,7 +210,9 @@ pub(crate) enum Builtin2 {
 impl Builtin2 {
     fn eval<'v>(self, a: Value<'v>, b: Value<'v>, heap: Heap<'v>) -> crate::Result<Value<'v>> {
         match self {
+            Builtin2::Equals if nan_unequal(a, b) => Ok(Value::new_bool(false)),
             Builtin2::Equals => a.equals(b).map(Value::new_bool),
+            Builtin2::Compare(_) if nan_unordered(a, b) => Ok(Value::new_bool(false)),
             Builtin2::Compare(cmp) => a.compare(b).map(|c| Value::new_bool(cmp.apply(c))),
             Builtin2::In => b.is_in(a).map(Value::new_bool),
             Builtin2::Sub => a.sub(b, heap),
